@@ -1,13 +1,27 @@
-use anyhow::{Context, Result};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 
-use sha2::{Sha256, Digest};
+use anyhow::{Context, Result};
+use digest::DynDigest;
 
-pub fn hash_on_disk_sha256(path: &Path, maxlen: Option<usize>) -> Result<omaha::Hash<omaha::Sha256>> {
+#[derive(Debug)]
+pub enum DigestAlgorithm {
+    Sha1,
+    Sha256,
+}
+
+#[allow(clippy::box_default)]
+fn select_hasher(hash_algo: DigestAlgorithm) -> Box<dyn DynDigest> {
+    match hash_algo {
+        DigestAlgorithm::Sha1 => Box::new(sha1::Sha1::default()),
+        DigestAlgorithm::Sha256 => Box::new(sha2::Sha256::default()),
+    }
+}
+
+pub fn hash_on_disk_digest(path: &Path, maxlen: Option<usize>, alg: DigestAlgorithm) -> Result<omaha::Hash<omaha::Sha256>> {
     let file = File::open(path).context(format!("failed to open path({:?})", path.display()))?;
-    let mut hasher = Sha256::new();
+    let mut hasher = select_hasher(alg);
 
     let filelen = file.metadata().context(format!("failed to get metadata of {:?}", path.display()))?.len() as usize;
 
@@ -44,5 +58,7 @@ pub fn hash_on_disk_sha256(path: &Path, maxlen: Option<usize>) -> Result<omaha::
         hasher.update(&databuf);
     }
 
-    Ok(omaha::Hash::from_bytes(hasher.finalize().into()))
+    Ok(omaha::Hash::from_bytes(
+        hasher.finalize().to_vec().try_into().unwrap_or_default(),
+    ))
 }

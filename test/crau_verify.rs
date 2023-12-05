@@ -3,6 +3,7 @@ use std::error::Error;
 use std::fs;
 
 use update_format_crau::delta_update;
+use ue_rs::DigestAlgorithm;
 
 use anyhow::Context;
 use argh::FromArgs;
@@ -45,7 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Get length of header and data, including header and manifest.
     let header_data_length = delta_update::get_header_data_length(&header, &delta_archive_manifest).context("failed to get header data length")?;
-    let hdhash = ue_rs::hash_on_disk_sha256(headerdatapath.as_path(), Some(header_data_length))?;
+    let hdhash = ue_rs::hash_on_disk_digest(headerdatapath.as_path(), Some(header_data_length), DigestAlgorithm::Sha256)?;
     let hdhashvec: Vec<u8> = hdhash.clone().into();
 
     // Get length of header and data
